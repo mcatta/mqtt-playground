@@ -1,0 +1,12 @@
+node_modules/
+.env
+*.log
+.DS_Store
+
+# TLS/PSK Security files
+config/certs/
+config/pskfile.txt
+*.key
+*.crt
+*.csr
+*.pem
