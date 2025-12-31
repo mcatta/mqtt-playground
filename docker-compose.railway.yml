@@ -1,0 +1,37 @@
+version: "3.7"
+
+# Docker Compose for Railway.app
+# Railway automatically manages public ports
+
+services:
+  mqtt:
+    image: eclipse-mosquitto:latest
+    container_name: mosquitto_meshtastic
+    # Railway will automatically assign external ports
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+      - "8883:8883"
+    volumes:
+      # Railway uses persistent volumes
+      - mqtt-config:/mosquitto/config
+      - mqtt-data:/mosquitto/data
+      - mqtt-log:/mosquitto/log
+    restart: unless-stopped
+    environment:
+      # Environment variables for Railway
+      - RAILWAY_ENVIRONMENT=${RAILWAY_ENVIRONMENT:-production}
+    healthcheck:
+      test: ["CMD", "mosquitto_sub", "-t", "$$SYS/#", "-C", "1", "-i", "healthcheck", "-W", "3"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  mqtt-config:
+    driver: local
+  mqtt-data:
+    driver: local
+  mqtt-log:
+    driver: local
