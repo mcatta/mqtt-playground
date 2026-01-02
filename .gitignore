@@ -10,3 +10,4 @@ config/pskfile.txt
 *.crt
 *.csr
 *.pem
+data/mosquitto.db<
