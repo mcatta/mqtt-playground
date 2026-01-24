@@ -7,12 +7,19 @@
     "start": "node src/index.js",
     "dev": "node --watch src/index.js"
   },
-  "keywords": ["meshtastic", "mqtt", "mosquitto", "database", "logger"],
+  "keywords": [
+    "meshtastic",
+    "mqtt",
+    "mosquitto",
+    "database",
+    "logger"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@meshtastic/protobufs": "^2.7.8",
+    "dotenv": "^16.4.1",
     "mqtt": "^5.3.5",
-    "mysql2": "^3.9.1",
-    "dotenv": "^16.4.1"
+    "mysql2": "^3.9.1"
   }
 }

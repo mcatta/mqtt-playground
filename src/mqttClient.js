@@ -1,5 +1,6 @@
 const mqtt = require('mqtt');
 const fs = require('fs');
+const { meshtastic } = require('@meshtastic/protobufs');
 
 class MeshtasticMQTTClient {
   constructor(config, database) {
@@ -89,20 +90,29 @@ class MeshtasticMQTTClient {
 
   async handleMessage(topic, message) {
     try {
-      const payload = message.toString();
       console.log(`\nReceived message on topic: ${topic}`);
-      console.log(`Payload: ${payload.substring(0, 200)}${payload.length > 200 ? '...' : ''}`);
+      console.log(`Message size: ${message.length} bytes`);
 
-      // Parse the message
-      let parsedData = null;
+      // Decode the protobuf message
+      let envelope = null;
+      let packet = null;
       try {
-        parsedData = JSON.parse(payload);
-      } catch (parseError) {
-        console.warn('Could not parse message as JSON');
+        // Decode the ServiceEnvelope
+        envelope = meshtastic.ServiceEnvelope.decode(message);
+        console.log('Decoded ServiceEnvelope successfully');
+
+        // If the envelope contains a packet, decode it
+        if (envelope.packet) {
+          packet = envelope.packet;
+          console.log(`Packet from: ${packet.from?.toString(16)}, to: ${packet.to?.toString(16)}`);
+        }
+      } catch (decodeError) {
+        console.error('Could not decode protobuf message:', decodeError.message);
+        return;
       }
 
       // Extract Meshtastic-specific fields
-      const eventData = this.extractMeshtasticData(topic, payload, parsedData);
+      const eventData = this.extractMeshtasticData(topic, message, envelope, packet);
 
       // Insert into database
       const insertId = await this.database.insertEvent(eventData);
@@ -113,11 +123,11 @@ class MeshtasticMQTTClient {
     }
   }
 
-  extractMeshtasticData(topic, payload, parsedData) {
+  extractMeshtasticData(topic, rawPayload, envelope, packet) {
     const eventData = {
       topic,
-      payload,
-      parsedData,
+      payload: rawPayload.toString('base64'), // Store as base64 for binary data
+      parsedData: null,
       nodeId: null,
       fromNode: null,
       toNode: null,
@@ -133,59 +143,116 @@ class MeshtasticMQTTClient {
       messageText: null
     };
 
-    if (parsedData) {
-      // Extract common Meshtastic fields
-      eventData.fromNode = parsedData.from || null;
-      eventData.toNode = parsedData.to || null;
-      eventData.channel = parsedData.channel || null;
-      eventData.packetId = parsedData.id || null;
-      eventData.hopLimit = parsedData.hopLimit || null;
-      eventData.wantAck = parsedData.wantAck || null;
-      eventData.hopStart = parsedData.hopStart || null;
+    if (!packet) {
+      return eventData;
+    }
 
-      // Extract node ID from sender
-      if (parsedData.sender) {
-        eventData.nodeId = parsedData.sender;
-      }
+    try {
+      // Extract basic packet fields
+      eventData.fromNode = packet.from ? packet.from.toString() : null;
+      eventData.toNode = packet.to ? packet.to.toString() : null;
+      eventData.channel = packet.channel || null;
+      eventData.packetId = packet.id || null;
+      eventData.hopLimit = packet.hopLimit || null;
+      eventData.wantAck = packet.wantAck || null;
+      eventData.hopStart = packet.hopStart || null;
 
       // Extract reception metadata
-      if (parsedData.rxTime) {
-        eventData.rxTime = parsedData.rxTime;
+      if (packet.rxTime) {
+        eventData.rxTime = packet.rxTime;
       }
-      if (parsedData.rxSnr) {
-        eventData.rxSnr = parsedData.rxSnr;
+      if (packet.rxSnr) {
+        eventData.rxSnr = packet.rxSnr;
       }
-      if (parsedData.rxRssi) {
-        eventData.rxRssi = parsedData.rxRssi;
+      if (packet.rxRssi) {
+        eventData.rxRssi = packet.rxRssi;
       }
 
-      // Extract payload/message type and content
-      if (parsedData.payload) {
-        if (typeof parsedData.payload === 'object') {
-          eventData.messageType = parsedData.payload.portnum || parsedData.type || null;
+      // Extract channel ID from envelope
+      if (envelope.channelId) {
+        eventData.nodeId = envelope.channelId;
+      }
 
-          // Text message
-          if (parsedData.payload.text) {
-            eventData.messageText = parsedData.payload.text;
-          }
+      // Decode the encrypted/decoded payload if present
+      if (packet.decoded) {
+        const decoded = packet.decoded;
+        eventData.messageType = decoded.portnum || null;
 
-          // Decoded payload
-          if (parsedData.payload.decoded) {
-            const decoded = parsedData.payload.decoded;
-            if (decoded.text) {
-              eventData.messageText = decoded.text;
+        // Try to decode the payload based on portnum
+        if (decoded.payload && decoded.portnum) {
+          try {
+            switch (decoded.portnum) {
+              case meshtastic.PortNum.TEXT_MESSAGE_APP:
+                // Decode text message
+                const textPayload = meshtastic.Data.decode(decoded.payload);
+                if (textPayload.payload) {
+                  eventData.messageText = Buffer.from(textPayload.payload).toString('utf-8');
+                }
+                break;
+
+              case meshtastic.PortNum.POSITION_APP:
+                // Position data
+                const position = meshtastic.Position.decode(decoded.payload);
+                eventData.parsedData = {
+                  latitude: position.latitudeI ? position.latitudeI * 1e-7 : null,
+                  longitude: position.longitudeI ? position.longitudeI * 1e-7 : null,
+                  altitude: position.altitude || null,
+                  time: position.time || null
+                };
+                break;
+
+              case meshtastic.PortNum.NODEINFO_APP:
+                // Node info
+                const nodeInfo = meshtastic.User.decode(decoded.payload);
+                eventData.parsedData = {
+                  id: nodeInfo.id,
+                  longName: nodeInfo.longName,
+                  shortName: nodeInfo.shortName,
+                  macaddr: nodeInfo.macaddr ? Buffer.from(nodeInfo.macaddr).toString('hex') : null
+                };
+                break;
+
+              case meshtastic.PortNum.TELEMETRY_APP:
+                // Telemetry data
+                const telemetry = meshtastic.Telemetry.decode(decoded.payload);
+                eventData.parsedData = {
+                  deviceMetrics: telemetry.deviceMetrics,
+                  environmentMetrics: telemetry.environmentMetrics,
+                  airQualityMetrics: telemetry.airQualityMetrics
+                };
+                break;
+
+              default:
+                // Store raw payload for other message types
+                eventData.parsedData = {
+                  portnum: decoded.portnum,
+                  payloadBase64: Buffer.from(decoded.payload).toString('base64')
+                };
             }
-            if (decoded.portnum) {
-              eventData.messageType = decoded.portnum;
-            }
+          } catch (payloadDecodeError) {
+            console.warn(`Could not decode payload for portnum ${decoded.portnum}:`, payloadDecodeError.message);
           }
         }
       }
 
-      // Alternative field names
-      if (parsedData.type && !eventData.messageType) {
-        eventData.messageType = parsedData.type;
+      // Store the full packet as JSON for reference
+      if (!eventData.parsedData) {
+        eventData.parsedData = JSON.stringify({
+          from: packet.from?.toString(),
+          to: packet.to?.toString(),
+          channel: packet.channel,
+          id: packet.id,
+          decoded: packet.decoded ? {
+            portnum: packet.decoded.portnum,
+            wantResponse: packet.decoded.wantResponse
+          } : null
+        });
+      } else if (typeof eventData.parsedData === 'object') {
+        eventData.parsedData = JSON.stringify(eventData.parsedData);
       }
+
+    } catch (error) {
+      console.error('Error extracting Meshtastic data:', error);
     }
 
     return eventData;
