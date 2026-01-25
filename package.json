@@ -2,6 +2,7 @@
   "name": "meshtastic-mqtt-logger",
   "version": "1.0.0",
   "description": "Node.js application to subscribe to Meshtastic MQTT topics and log events to SQL database",
+  "type": "module",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",

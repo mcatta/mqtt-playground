@@ -1,6 +1,6 @@
-const config = require('./config');
-const Database = require('./database');
-const MeshtasticMQTTClient = require('./mqttClient');
+import config from './config.js';
+import Database from './database.js';
+import MeshtasticMQTTClient from './mqttClient.js';
 
 async function main() {
   console.log('Starting Meshtastic MQTT Logger...');

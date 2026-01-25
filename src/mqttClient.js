@@ -1,6 +1,6 @@
-const mqtt = require('mqtt');
-const fs = require('fs');
-const { meshtastic } = require('@meshtastic/protobufs');
+import mqtt from 'mqtt';
+import fs from 'fs';
+import { Mqtt, Mesh, Portnums, Telemetry } from '@meshtastic/protobufs';
 
 class MeshtasticMQTTClient {
   constructor(config, database) {
@@ -98,7 +98,7 @@ class MeshtasticMQTTClient {
       let packet = null;
       try {
         // Decode the ServiceEnvelope
-        envelope = meshtastic.ServiceEnvelope.decode(message);
+        envelope = Mqtt.ServiceEnvelope.decode(message);
         console.log('Decoded ServiceEnvelope successfully');
 
         // If the envelope contains a packet, decode it
@@ -182,17 +182,17 @@ class MeshtasticMQTTClient {
         if (decoded.payload && decoded.portnum) {
           try {
             switch (decoded.portnum) {
-              case meshtastic.PortNum.TEXT_MESSAGE_APP:
+              case Portnums.PortNum.TEXT_MESSAGE_APP:
                 // Decode text message
-                const textPayload = meshtastic.Data.decode(decoded.payload);
+                const textPayload = Mesh.Data.decode(decoded.payload);
                 if (textPayload.payload) {
                   eventData.messageText = Buffer.from(textPayload.payload).toString('utf-8');
                 }
                 break;
 
-              case meshtastic.PortNum.POSITION_APP:
+              case Portnums.PortNum.POSITION_APP:
                 // Position data
-                const position = meshtastic.Position.decode(decoded.payload);
+                const position = Mesh.Position.decode(decoded.payload);
                 eventData.parsedData = {
                   latitude: position.latitudeI ? position.latitudeI * 1e-7 : null,
                   longitude: position.longitudeI ? position.longitudeI * 1e-7 : null,
@@ -201,9 +201,9 @@ class MeshtasticMQTTClient {
                 };
                 break;
 
-              case meshtastic.PortNum.NODEINFO_APP:
+              case Portnums.PortNum.NODEINFO_APP:
                 // Node info
-                const nodeInfo = meshtastic.User.decode(decoded.payload);
+                const nodeInfo = Mesh.User.decode(decoded.payload);
                 eventData.parsedData = {
                   id: nodeInfo.id,
                   longName: nodeInfo.longName,
@@ -212,9 +212,9 @@ class MeshtasticMQTTClient {
                 };
                 break;
 
-              case meshtastic.PortNum.TELEMETRY_APP:
+              case Portnums.PortNum.TELEMETRY_APP:
                 // Telemetry data
-                const telemetry = meshtastic.Telemetry.decode(decoded.payload);
+                const telemetry = Telemetry.Telemetry.decode(decoded.payload);
                 eventData.parsedData = {
                   deviceMetrics: telemetry.deviceMetrics,
                   environmentMetrics: telemetry.environmentMetrics,
@@ -266,4 +266,4 @@ class MeshtasticMQTTClient {
   }
 }
 
-module.exports = MeshtasticMQTTClient;
+export default MeshtasticMQTTClient;
