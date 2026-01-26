@@ -26,28 +26,30 @@ class MessageHandler {
         if (envelope.packet) {
           packet = envelope.packet;
           console.log(`Packet from: ${packet.from?.toString(16)}, to: ${packet.to?.toString(16)}`);
-          console.log('Packet fields:', Object.keys(packet));
-          console.log('Packet structure:', JSON.stringify(packet, (key, value) => {
-            // Convert BigInt and Buffer to readable format
-            if (typeof value === 'bigint') return value.toString();
-            if (value?.type === 'Buffer') return `<Buffer ${value.data?.length || 0} bytes>`;
-            if (Buffer.isBuffer(value)) return `<Buffer ${value.length} bytes>`;
-            return value;
-          }, 2));
-          console.log('Has decoded?', !!packet.decoded);
-          console.log('Has encrypted?', !!packet.encrypted);
+
+          // Check payload variant (new protobuf structure)
+          const isEncrypted = packet.payloadVariant?.case === 'encrypted';
+          const isDecoded = packet.payloadVariant?.case === 'decoded';
+
+          console.log('Payload type:', packet.payloadVariant?.case || 'none');
+          console.log('Is encrypted?', isEncrypted);
+          console.log('Is decoded?', isDecoded);
 
           // If packet is encrypted and we have an encryption key, decrypt it
-          if (packet.encrypted && this.encryptionKey) {
+          if (isEncrypted && this.encryptionKey) {
             console.log('Attempting to decrypt packet...');
             const decrypted = this.decryptPacket(packet);
             if (decrypted) {
-              packet.decoded = decrypted;
+              // Update the packet to have decoded payload
+              packet.payloadVariant = {
+                case: 'decoded',
+                value: decrypted
+              };
               console.log('Packet decrypted successfully');
             } else {
               console.warn('Failed to decrypt packet');
             }
-          } else if (packet.encrypted && !this.encryptionKey) {
+          } else if (isEncrypted && !this.encryptionKey) {
             console.warn('Packet is encrypted but no encryption key provided');
           }
         }
@@ -131,8 +133,10 @@ class MessageHandler {
       }
 
       // Decode the encrypted/decoded payload if present
-      if (packet.decoded) {
-        const decoded = packet.decoded;
+      // Handle new payloadVariant structure
+      const decoded = packet.payloadVariant?.case === 'decoded' ? packet.payloadVariant.value : null;
+
+      if (decoded) {
         eventData.messageType = decoded.portnum || null;
 
         // Get portnum type name
@@ -205,7 +209,8 @@ class MessageHandler {
   }
 
   decryptPacket(packet) {
-    if (!packet.encrypted || !this.encryptionKey) {
+    // Check if packet has encrypted payload in the new structure
+    if (packet.payloadVariant?.case !== 'encrypted' || !this.encryptionKey) {
       return null;
     }
 
@@ -243,8 +248,8 @@ class MessageHandler {
       // Create decipher using AES-256-CTR
       const decipher = crypto.createDecipheriv('aes-256-ctr', keyBuffer, nonce);
 
-      // Decrypt the payload
-      const encrypted = Buffer.from(packet.encrypted);
+      // Decrypt the payload from payloadVariant.value
+      const encrypted = Buffer.from(packet.payloadVariant.value);
       const decrypted = Buffer.concat([
         decipher.update(encrypted),
         decipher.final()
