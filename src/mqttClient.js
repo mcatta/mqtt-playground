@@ -1,5 +1,6 @@
 import mqtt from 'mqtt';
 import fs from 'fs';
+import { fromBinary } from '@bufbuild/protobuf';
 import { Mqtt, Mesh, Portnums, Telemetry } from '@meshtastic/protobufs';
 
 class MeshtasticMQTTClient {
@@ -98,7 +99,7 @@ class MeshtasticMQTTClient {
       let packet = null;
       try {
         // Decode the ServiceEnvelope
-        envelope = Mqtt.ServiceEnvelope.decode(message);
+        envelope = fromBinary(Mqtt.ServiceEnvelopeSchema, message);
         console.log('Decoded ServiceEnvelope successfully');
 
         // If the envelope contains a packet, decode it
@@ -184,7 +185,7 @@ class MeshtasticMQTTClient {
             switch (decoded.portnum) {
               case Portnums.PortNum.TEXT_MESSAGE_APP:
                 // Decode text message
-                const textPayload = Mesh.Data.decode(decoded.payload);
+                const textPayload = fromBinary(Mesh.DataSchema, decoded.payload);
                 if (textPayload.payload) {
                   eventData.messageText = Buffer.from(textPayload.payload).toString('utf-8');
                 }
@@ -192,7 +193,7 @@ class MeshtasticMQTTClient {
 
               case Portnums.PortNum.POSITION_APP:
                 // Position data
-                const position = Mesh.Position.decode(decoded.payload);
+                const position = fromBinary(Mesh.PositionSchema, decoded.payload);
                 eventData.parsedData = {
                   latitude: position.latitudeI ? position.latitudeI * 1e-7 : null,
                   longitude: position.longitudeI ? position.longitudeI * 1e-7 : null,
@@ -203,7 +204,7 @@ class MeshtasticMQTTClient {
 
               case Portnums.PortNum.NODEINFO_APP:
                 // Node info
-                const nodeInfo = Mesh.User.decode(decoded.payload);
+                const nodeInfo = fromBinary(Mesh.UserSchema, decoded.payload);
                 eventData.parsedData = {
                   id: nodeInfo.id,
                   longName: nodeInfo.longName,
@@ -214,7 +215,7 @@ class MeshtasticMQTTClient {
 
               case Portnums.PortNum.TELEMETRY_APP:
                 // Telemetry data
-                const telemetry = Telemetry.Telemetry.decode(decoded.payload);
+                const telemetry = fromBinary(Telemetry.TelemetrySchema, decoded.payload);
                 eventData.parsedData = {
                   deviceMetrics: telemetry.deviceMetrics,
                   environmentMetrics: telemetry.environmentMetrics,
