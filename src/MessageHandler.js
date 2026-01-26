@@ -27,6 +27,13 @@ class MessageHandler {
           packet = envelope.packet;
           console.log(`Packet from: ${packet.from?.toString(16)}, to: ${packet.to?.toString(16)}`);
           console.log('Packet fields:', Object.keys(packet));
+          console.log('Packet structure:', JSON.stringify(packet, (key, value) => {
+            // Convert BigInt and Buffer to readable format
+            if (typeof value === 'bigint') return value.toString();
+            if (value?.type === 'Buffer') return `<Buffer ${value.data?.length || 0} bytes>`;
+            if (Buffer.isBuffer(value)) return `<Buffer ${value.length} bytes>`;
+            return value;
+          }, 2));
           console.log('Has decoded?', !!packet.decoded);
           console.log('Has encrypted?', !!packet.encrypted);
 
