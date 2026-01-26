@@ -58,7 +58,19 @@ class MessageHandler {
       rxRssi: null,
       hopStart: null,
       messageType: null,
-      messageText: null
+      portnumType: null,
+      messageText: null,
+      latitude: null,
+      longitude: null,
+      altitude: null,
+      positionTime: null,
+      nodeInfoId: null,
+      longName: null,
+      shortName: null,
+      macAddress: null,
+      deviceMetrics: null,
+      environmentMetrics: null,
+      airQualityMetrics: null
     };
 
     if (!packet) {
@@ -96,6 +108,10 @@ class MessageHandler {
         const decoded = packet.decoded;
         eventData.messageType = decoded.portnum || null;
 
+        // Get portnum type name
+        const portnumName = this.getPortnumName(decoded.portnum);
+        eventData.portnumType = portnumName;
+
         // Try to decode the payload based on portnum
         if (decoded.payload && decoded.portnum) {
           try {
@@ -111,33 +127,27 @@ class MessageHandler {
               case Portnums.PortNum.POSITION_APP:
                 // Position data
                 const position = fromBinary(Mesh.PositionSchema, decoded.payload);
-                eventData.parsedData = {
-                  latitude: position.latitudeI ? position.latitudeI * 1e-7 : null,
-                  longitude: position.longitudeI ? position.longitudeI * 1e-7 : null,
-                  altitude: position.altitude || null,
-                  time: position.time || null
-                };
+                eventData.latitude = position.latitudeI ? position.latitudeI * 1e-7 : null;
+                eventData.longitude = position.longitudeI ? position.longitudeI * 1e-7 : null;
+                eventData.altitude = position.altitude || null;
+                eventData.positionTime = position.time || null;
                 break;
 
               case Portnums.PortNum.NODEINFO_APP:
                 // Node info
                 const nodeInfo = fromBinary(Mesh.UserSchema, decoded.payload);
-                eventData.parsedData = {
-                  id: nodeInfo.id,
-                  longName: nodeInfo.longName,
-                  shortName: nodeInfo.shortName,
-                  macaddr: nodeInfo.macaddr ? Buffer.from(nodeInfo.macaddr).toString('hex') : null
-                };
+                eventData.nodeInfoId = nodeInfo.id || null;
+                eventData.longName = nodeInfo.longName || null;
+                eventData.shortName = nodeInfo.shortName || null;
+                eventData.macAddress = nodeInfo.macaddr ? Buffer.from(nodeInfo.macaddr).toString('hex') : null;
                 break;
 
               case Portnums.PortNum.TELEMETRY_APP:
                 // Telemetry data
                 const telemetry = fromBinary(Telemetry.TelemetrySchema, decoded.payload);
-                eventData.parsedData = {
-                  deviceMetrics: telemetry.deviceMetrics,
-                  environmentMetrics: telemetry.environmentMetrics,
-                  airQualityMetrics: telemetry.airQualityMetrics
-                };
+                eventData.deviceMetrics = telemetry.deviceMetrics || null;
+                eventData.environmentMetrics = telemetry.environmentMetrics || null;
+                eventData.airQualityMetrics = telemetry.airQualityMetrics || null;
                 break;
 
               default:
@@ -153,20 +163,11 @@ class MessageHandler {
         }
       }
 
-      // Store the full packet as JSON for reference
-      if (!eventData.parsedData) {
-        eventData.parsedData = JSON.stringify({
-          from: packet.from?.toString(),
-          to: packet.to?.toString(),
-          channel: packet.channel,
-          id: packet.id,
-          decoded: packet.decoded ? {
-            portnum: packet.decoded.portnum,
-            wantResponse: packet.decoded.wantResponse
-          } : null
-        });
-      } else if (typeof eventData.parsedData === 'object') {
+      // Store additional packet info in parsedData if needed (for unknown message types)
+      if (eventData.parsedData && typeof eventData.parsedData === 'object') {
         eventData.parsedData = JSON.stringify(eventData.parsedData);
+      } else {
+        eventData.parsedData = null;
       }
 
     } catch (error) {
@@ -174,6 +175,43 @@ class MessageHandler {
     }
 
     return eventData;
+  }
+
+  getPortnumName(portnum) {
+    if (portnum === null || portnum === undefined) {
+      return null;
+    }
+
+    const portnumMap = {
+      [Portnums.PortNum.UNKNOWN_APP]: 'UNKNOWN_APP',
+      [Portnums.PortNum.TEXT_MESSAGE_APP]: 'TEXT_MESSAGE_APP',
+      [Portnums.PortNum.REMOTE_HARDWARE_APP]: 'REMOTE_HARDWARE_APP',
+      [Portnums.PortNum.POSITION_APP]: 'POSITION_APP',
+      [Portnums.PortNum.NODEINFO_APP]: 'NODEINFO_APP',
+      [Portnums.PortNum.ROUTING_APP]: 'ROUTING_APP',
+      [Portnums.PortNum.ADMIN_APP]: 'ADMIN_APP',
+      [Portnums.PortNum.TEXT_MESSAGE_COMPRESSED_APP]: 'TEXT_MESSAGE_COMPRESSED_APP',
+      [Portnums.PortNum.WAYPOINT_APP]: 'WAYPOINT_APP',
+      [Portnums.PortNum.AUDIO_APP]: 'AUDIO_APP',
+      [Portnums.PortNum.DETECTION_SENSOR_APP]: 'DETECTION_SENSOR_APP',
+      [Portnums.PortNum.REPLY_APP]: 'REPLY_APP',
+      [Portnums.PortNum.IP_TUNNEL_APP]: 'IP_TUNNEL_APP',
+      [Portnums.PortNum.PAXCOUNTER_APP]: 'PAXCOUNTER_APP',
+      [Portnums.PortNum.SERIAL_APP]: 'SERIAL_APP',
+      [Portnums.PortNum.STORE_FORWARD_APP]: 'STORE_FORWARD_APP',
+      [Portnums.PortNum.RANGE_TEST_APP]: 'RANGE_TEST_APP',
+      [Portnums.PortNum.TELEMETRY_APP]: 'TELEMETRY_APP',
+      [Portnums.PortNum.ZPS_APP]: 'ZPS_APP',
+      [Portnums.PortNum.SIMULATOR_APP]: 'SIMULATOR_APP',
+      [Portnums.PortNum.TRACEROUTE_APP]: 'TRACEROUTE_APP',
+      [Portnums.PortNum.NEIGHBORINFO_APP]: 'NEIGHBORINFO_APP',
+      [Portnums.PortNum.ATAK_PLUGIN]: 'ATAK_PLUGIN',
+      [Portnums.PortNum.MAP_REPORT_APP]: 'MAP_REPORT_APP',
+      [Portnums.PortNum.PRIVATE_APP]: 'PRIVATE_APP',
+      [Portnums.PortNum.ATAK_FORWARDER]: 'ATAK_FORWARDER'
+    };
+
+    return portnumMap[portnum] || `UNKNOWN_${portnum}`;
   }
 }
 

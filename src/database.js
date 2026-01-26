@@ -52,12 +52,25 @@ class Database {
         rx_rssi INT,
         hop_start INT,
         message_type VARCHAR(50),
+        portnum_type VARCHAR(50),
         message_text TEXT,
+        latitude DECIMAL(10, 7),
+        longitude DECIMAL(10, 7),
+        altitude INT,
+        position_time BIGINT,
+        node_info_id VARCHAR(255),
+        long_name VARCHAR(255),
+        short_name VARCHAR(50),
+        mac_address VARCHAR(50),
+        device_metrics JSON,
+        environment_metrics JSON,
+        air_quality_metrics JSON,
         received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         INDEX idx_topic (topic),
         INDEX idx_node_id (node_id),
         INDEX idx_from_node (from_node),
-        INDEX idx_received_at (received_at)
+        INDEX idx_received_at (received_at),
+        INDEX idx_portnum_type (portnum_type)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `;
 
@@ -75,8 +88,11 @@ class Database {
       INSERT INTO meshtastic_events (
         topic, payload, parsed_data, node_id, from_node, to_node,
         channel, packet_id, hop_limit, want_ack, rx_time,
-        rx_snr, rx_rssi, hop_start, message_type, message_text
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        rx_snr, rx_rssi, hop_start, message_type, portnum_type, message_text,
+        latitude, longitude, altitude, position_time,
+        node_info_id, long_name, short_name, mac_address,
+        device_metrics, environment_metrics, air_quality_metrics
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     try {
@@ -96,7 +112,19 @@ class Database {
         eventData.rxRssi,
         eventData.hopStart,
         eventData.messageType,
-        eventData.messageText
+        eventData.portnumType,
+        eventData.messageText,
+        eventData.latitude,
+        eventData.longitude,
+        eventData.altitude,
+        eventData.positionTime,
+        eventData.nodeInfoId,
+        eventData.longName,
+        eventData.shortName,
+        eventData.macAddress,
+        eventData.deviceMetrics ? JSON.stringify(eventData.deviceMetrics) : null,
+        eventData.environmentMetrics ? JSON.stringify(eventData.environmentMetrics) : null,
+        eventData.airQualityMetrics ? JSON.stringify(eventData.airQualityMetrics) : null
       ]);
 
       return result.insertId;
