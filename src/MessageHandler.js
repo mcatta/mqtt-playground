@@ -1,9 +1,12 @@
 import { fromBinary } from '@bufbuild/protobuf';
 import { Mqtt, Mesh, Portnums, Telemetry } from '@meshtastic/protobufs';
+import crypto from 'crypto';
 
 class MessageHandler {
-  constructor(database) {
+  constructor(database, encryptionKey = null) {
     this.database = database;
+    // Encryption key should be the channel PSK in hex format (e.g., "AQ==" base64 or hex string)
+    this.encryptionKey = encryptionKey;
   }
 
   async handle(topic, message) {
@@ -23,6 +26,23 @@ class MessageHandler {
         if (envelope.packet) {
           packet = envelope.packet;
           console.log(`Packet from: ${packet.from?.toString(16)}, to: ${packet.to?.toString(16)}`);
+          console.log('Packet fields:', Object.keys(packet));
+          console.log('Has decoded?', !!packet.decoded);
+          console.log('Has encrypted?', !!packet.encrypted);
+
+          // If packet is encrypted and we have an encryption key, decrypt it
+          if (packet.encrypted && this.encryptionKey) {
+            console.log('Attempting to decrypt packet...');
+            const decrypted = this.decryptPacket(packet);
+            if (decrypted) {
+              packet.decoded = decrypted;
+              console.log('Packet decrypted successfully');
+            } else {
+              console.warn('Failed to decrypt packet');
+            }
+          } else if (packet.encrypted && !this.encryptionKey) {
+            console.warn('Packet is encrypted but no encryption key provided');
+          }
         }
       } catch (decodeError) {
         console.error('Could not decode protobuf message:', decodeError.message);
@@ -111,7 +131,7 @@ class MessageHandler {
         // Get portnum type name
         const portnumName = this.getPortnumName(decoded.portnum);
         eventData.portnumType = portnumName;
-
+        console.log("portnumName: " + portnumName);
         // Try to decode the payload based on portnum
         if (decoded.payload && decoded.portnum) {
           try {
@@ -175,6 +195,62 @@ class MessageHandler {
     }
 
     return eventData;
+  }
+
+  decryptPacket(packet) {
+    if (!packet.encrypted || !this.encryptionKey) {
+      return null;
+    }
+
+    try {
+      // Convert encryption key from base64 or hex to buffer
+      let keyBuffer;
+      if (this.encryptionKey.includes('=') || this.encryptionKey.length < 32) {
+        // Likely base64
+        keyBuffer = Buffer.from(this.encryptionKey, 'base64');
+      } else {
+        // Likely hex
+        keyBuffer = Buffer.from(this.encryptionKey, 'hex');
+      }
+
+      // Ensure key is 32 bytes (256 bits) for AES-256
+      if (keyBuffer.length === 16) {
+        // If it's a 16-byte key, pad it to 32 bytes
+        keyBuffer = Buffer.concat([keyBuffer, Buffer.alloc(16)]);
+      } else if (keyBuffer.length !== 32) {
+        console.error(`Invalid key length: ${keyBuffer.length} bytes (expected 32)`);
+        return null;
+      }
+
+      // Create nonce (16 bytes) from packet ID and sender
+      const nonce = Buffer.alloc(16);
+
+      // Put packet ID in first 8 bytes (little-endian)
+      nonce.writeUInt32LE(packet.id || 0, 0);
+
+      // Put sender node ID in next 8 bytes (little-endian)
+      if (packet.from) {
+        nonce.writeBigUInt64LE(BigInt(packet.from), 8);
+      }
+
+      // Create decipher using AES-256-CTR
+      const decipher = crypto.createDecipheriv('aes-256-ctr', keyBuffer, nonce);
+
+      // Decrypt the payload
+      const encrypted = Buffer.from(packet.encrypted);
+      const decrypted = Buffer.concat([
+        decipher.update(encrypted),
+        decipher.final()
+      ]);
+
+      // Parse the decrypted data as a Data protobuf message
+      const data = fromBinary(Mesh.DataSchema, decrypted);
+      return data;
+
+    } catch (error) {
+      console.error('Decryption error:', error.message);
+      return null;
+    }
   }
 
   getPortnumName(portnum) {

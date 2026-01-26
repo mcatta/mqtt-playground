@@ -7,7 +7,7 @@ class MeshtasticMQTTClient {
     this.config = config;
     this.database = database;
     this.client = null;
-    this.messageHandler = new MessageHandler(database);
+    this.messageHandler = new MessageHandler(database, config.channelKey);
   }
 
   connect() {
