@@ -1,8 +1,14 @@
 node_modules/
 .env
+.env.local
 *.log
 .DS_Store
 .claude/
+
+# Next.js
+api/.next/
+api/out/
+api/.vercel
 
 # TLS/PSK Security files
 config/certs/

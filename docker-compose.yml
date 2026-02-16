@@ -1,0 +1,119 @@
+version: '3.8'
+
+services:
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: meshtastic-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: meshtastic
+      MYSQL_USER: meshtastic
+      MYSQL_PASSWORD: meshtastic
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MQTT Broker (Mosquitto)
+  mqtt:
+    image: eclipse-mosquitto:2
+    container_name: meshtastic-mqtt
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./config/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - mqtt_data:/mosquitto/data
+      - mqtt_log:/mosquitto/log
+    healthcheck:
+      test: ["CMD", "mosquitto_sub", "-t", "$$SYS/#", "-C", "1", "-i", "healthcheck", "-W", "3"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MQTT Logger Service
+  logger:
+    build:
+      context: ./logger
+      dockerfile: Dockerfile
+    container_name: meshtastic-logger
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      mqtt:
+        condition: service_healthy
+    environment:
+      # MQTT Configuration
+      MQTT_BROKER: mqtt://mqtt:1883
+      MQTT_USERNAME: ${MQTT_USERNAME:-admin}
+      MQTT_PASSWORD: ${MQTT_PASSWORD:-admin}
+      MQTT_CLIENT_ID: meshtastic-logger
+
+      # Meshtastic Configuration
+      MESHTASTIC_ROOT_TOPIC: ${MESHTASTIC_ROOT_TOPIC:-msh/US/#}
+      MESHTASTIC_CHANNEL_KEY: ${MESHTASTIC_CHANNEL_KEY:-}
+
+      # Database Configuration
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: meshtastic
+      DB_PASSWORD: meshtastic
+      DB_DATABASE: meshtastic
+
+      NODE_ENV: production
+    volumes:
+      - ./log:/app/log
+
+  # Web API Service
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: meshtastic-api
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      # Database Configuration
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: meshtastic
+      DB_PASSWORD: meshtastic
+      DB_DATABASE: meshtastic
+
+      # JWT Configuration
+      JWT_SECRET: ${JWT_SECRET:-change-this-to-a-secure-random-secret-minimum-32-characters-long}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-3600}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-604800}
+
+      # CORS Configuration
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+
+      # Server Configuration
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+
+      # Initial Admin Password
+      INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD:-admin}
+
+volumes:
+  mysql_data:
+  mqtt_data:
+  mqtt_log:
+
+networks:
+  default:
+    name: meshtastic-network
