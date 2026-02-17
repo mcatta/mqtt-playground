@@ -3,8 +3,11 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Copy everything from build context
+# Copy entire repository
 COPY . .
+
+# Change to api directory where package.json actually is
+WORKDIR /app/api
 
 # Install dependencies
 RUN npm install
@@ -15,7 +18,7 @@ RUN npm run build
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs && \
-    chown -R nextjs:nodejs /app
+    chown -R nextjs:nodejs /app/api
 
 USER nextjs
 
