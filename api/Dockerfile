@@ -3,14 +3,11 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Copy package files
-COPY package.json package-lock.json ./
-
-# Install ALL dependencies (needed for build)
-RUN npm install
-
-# Copy rest of application
+# Copy everything from build context
 COPY . .
+
+# Install dependencies
+RUN npm install
 
 # Build Next.js app
 RUN npm run build
