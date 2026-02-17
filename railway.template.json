@@ -1,0 +1,58 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "name": "Meshtastic Monitoring Platform",
+  "description": "Complete monitoring solution for Meshtastic mesh networks with MQTT logger and REST API",
+  "services": [
+    {
+      "name": "mysql",
+      "type": "mysql",
+      "plan": "hobby"
+    },
+    {
+      "name": "logger",
+      "source": {
+        "repo": "YOUR_GITHUB_USERNAME/mqtt-meshtastic",
+        "rootDirectory": "/logger"
+      },
+      "build": {
+        "builder": "DOCKERFILE"
+      },
+      "variables": {
+        "MQTT_BROKER": "mqtt://public.broker.url:1883",
+        "MQTT_USERNAME": "",
+        "MQTT_PASSWORD": "",
+        "MESHTASTIC_ROOT_TOPIC": "msh/US/#",
+        "MESHTASTIC_CHANNEL_KEY": "",
+        "DB_HOST": "${{mysql.MYSQLHOST}}",
+        "DB_PORT": "${{mysql.MYSQLPORT}}",
+        "DB_USER": "${{mysql.MYSQLUSER}}",
+        "DB_PASSWORD": "${{mysql.MYSQLPASSWORD}}",
+        "DB_DATABASE": "${{mysql.MYSQLDATABASE}}",
+        "NODE_ENV": "production"
+      }
+    },
+    {
+      "name": "api",
+      "source": {
+        "repo": "YOUR_GITHUB_USERNAME/mqtt-meshtastic",
+        "rootDirectory": "/api"
+      },
+      "build": {
+        "builder": "DOCKERFILE"
+      },
+      "variables": {
+        "DB_HOST": "${{mysql.MYSQLHOST}}",
+        "DB_PORT": "${{mysql.MYSQLPORT}}",
+        "DB_USER": "${{mysql.MYSQLUSER}}",
+        "DB_PASSWORD": "${{mysql.MYSQLPASSWORD}}",
+        "DB_DATABASE": "${{mysql.MYSQLDATABASE}}",
+        "JWT_SECRET": "CHANGE_THIS_TO_SECURE_RANDOM_STRING_MIN_32_CHARS",
+        "JWT_EXPIRES_IN": "3600",
+        "CORS_ORIGIN": "*",
+        "INITIAL_ADMIN_PASSWORD": "admin",
+        "NODE_ENV": "production",
+        "PORT": "3000"
+      }
+    }
+  ]
+}

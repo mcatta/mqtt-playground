@@ -111,78 +111,48 @@ REST API with JWT authentication for accessing collected mesh network data.
 
 ## ☁️ Railway Deployment
 
-Both services can be deployed to Railway with shared MySQL database.
+Both services are fully configured for deployment to Railway with a shared MySQL database.
 
-### Deployment Architecture
+### Quick Deploy
 
+**📋 See the comprehensive deployment guide:** [RAILWAY_DEPLOYMENT.md](./RAILWAY_DEPLOYMENT.md)
+
+### Deployment Steps Summary
+
+1. **Create Railway Project** - Deploy from GitHub repo
+2. **Add MySQL Database** - Railway provides connection variables
+3. **Deploy Logger Service** - Set root directory to `/logger`
+4. **Deploy API Service** - Set root directory to `/api`
+5. **Configure Environment Variables** - Reference MySQL service variables
+
+### Key Configuration
+
+Both services support **Dockerfile** (configured) or **Nixpacks** (Railway's preferred) build methods.
+
+**Logger Environment Variables:**
+```env
+MQTT_BROKER=mqtt://your-broker:1883
+DB_HOST=${{MySQL.MYSQLHOST}}
+DB_PORT=${{MySQL.MYSQLPORT}}
+DB_USER=${{MySQL.MYSQLUSER}}
+DB_PASSWORD=${{MySQL.MYSQLPASSWORD}}
+DB_DATABASE=${{MySQL.MYSQLDATABASE}}
+MESHTASTIC_ROOT_TOPIC=msh/US/#
+MESHTASTIC_CHANNEL_KEY=<optional>
 ```
-Railway Project
-├── MySQL Database (shared)
-├── MQTT Broker Service (mosquitto)
-├── Logger Service (/logger)
-└── API Service (/api)
+
+**API Environment Variables:**
+```env
+DB_HOST=${{MySQL.MYSQLHOST}}
+DB_PORT=${{MySQL.MYSQLPORT}}
+DB_USER=${{MySQL.MYSQLUSER}}
+DB_PASSWORD=${{MySQL.MYSQLPASSWORD}}
+DB_DATABASE=${{MySQL.MYSQLDATABASE}}
+JWT_SECRET=<generate-with-openssl-rand-base64-64>
+CORS_ORIGIN=*
 ```
 
-### Step 1: Deploy MySQL Database
-
-1. In Railway, click "+ New" → "Database" → "MySQL"
-2. Railway provisions MySQL and creates environment variables
-
-### Step 2: Deploy MQTT Broker (Optional)
-
-If you don't have an external MQTT broker:
-
-1. Click "+ New" → "Empty Service"
-2. Use [mosquitto-railway-template](https://github.com/Lima-e-Silva/mosquitto-railway-template)
-3. Configure environment variables
-
-### Step 3: Deploy Logger Service
-
-1. Click "+ New" → "GitHub Repo" → Select this repository
-2. Set **Root Directory:** `/logger`
-3. Add environment variables:
-   ```env
-   MQTT_BROKER=mqtt://mqtt-broker.railway.internal:1883
-   MQTT_USERNAME=<mqtt_user>
-   MQTT_PASSWORD=<mqtt_pass>
-   DB_HOST=${{MySQL.MYSQLHOST}}
-   DB_PORT=${{MySQL.MYSQLPORT}}
-   DB_USER=${{MySQL.MYSQLUSER}}
-   DB_PASSWORD=${{MySQL.MYSQLPASSWORD}}
-   DB_DATABASE=${{MySQL.MYSQLDATABASE}}
-   MESHTASTIC_ROOT_TOPIC=msh/US/#
-   MESHTASTIC_CHANNEL_KEY=<your_channel_key>
-   NODE_ENV=production
-   ```
-4. Deploy
-
-### Step 4: Deploy API Service
-
-1. Click "+ New" → "GitHub Repo" → Select this repository
-2. Set **Root Directory:** `/api`
-3. Add environment variables:
-   ```env
-   DB_HOST=${{MySQL.MYSQLHOST}}
-   DB_PORT=${{MySQL.MYSQLPORT}}
-   DB_USER=${{MySQL.MYSQLUSER}}
-   DB_PASSWORD=${{MySQL.MYSQLPASSWORD}}
-   DB_DATABASE=${{MySQL.MYSQLDATABASE}}
-   JWT_SECRET=<generate-secure-64-char-secret>
-   JWT_EXPIRES_IN=3600
-   CORS_ORIGIN=*
-   NODE_ENV=production
-   PORT=3000
-   ```
-4. Deploy
-5. Access your API at: `https://your-api-service.railway.app`
-
-### Generate JWT Secret
-
-```bash
-openssl rand -base64 64
-# Or
-node -e "console.log(require('crypto').randomBytes(64).toString('base64'))"
-```
+**📖 Full deployment guide with troubleshooting:** [RAILWAY_DEPLOYMENT.md](./RAILWAY_DEPLOYMENT.md)
 
 ## 🔒 Security
 
@@ -236,9 +206,18 @@ Logger Service → MySQL Database
 
 ## 📖 Documentation
 
+### Main Documentation
+- [README.md](./README.md) - This file (project overview)
+- [API Specification](API_SPECIFICATION.md) - Complete API endpoint documentation
+
+### Service Documentation
 - [Logger Service README](logger/README.md) - MQTT logger setup and configuration
 - [API Service README](api/README.md) - REST API usage and deployment
-- [API Specification](API_SPECIFICATION.md) - Complete API endpoint documentation
+
+### Railway Deployment
+- [⚡ Railway Quick Start](RAILWAY_QUICK_START.md) - **5-minute deployment guide**
+- [📋 Railway Deployment Guide](RAILWAY_DEPLOYMENT.md) - Complete step-by-step guide with troubleshooting
+- [✅ Deployment Checklist](DEPLOYMENT_CHECKLIST.md) - Verify your deployment is correct
 
 ## 🧪 Development
 
