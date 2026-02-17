@@ -3,14 +3,14 @@
 # Dependencies stage
 FROM node:18-alpine AS deps
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci --only=production
+COPY package*.json ./
+RUN npm ci --only=production || npm install --only=production
 
 # Builder stage
 FROM node:18-alpine AS builder
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci
+COPY package*.json ./
+RUN npm ci || npm install
 COPY . .
 RUN npm run build
 
