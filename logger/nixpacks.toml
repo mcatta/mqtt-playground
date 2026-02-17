@@ -8,4 +8,4 @@ cmds = ['npm ci --only=production']
 cmds = ['echo "No build step required for logger"']
 
 [start]
-cmd = 'node src/index.js'
+cmd = 'node logger/index.js'

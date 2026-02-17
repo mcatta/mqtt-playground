@@ -9,7 +9,7 @@ COPY package*.json ./
 RUN npm install --omit=dev
 
 # Copy application source
-COPY src/ ./src/
+COPY logger/ ./logger/
 
 # Create a non-root user
 RUN addgroup -g 1001 -S nodejs && \
@@ -19,4 +19,4 @@ RUN addgroup -g 1001 -S nodejs && \
 USER nodejs
 
 # Start the application
-CMD ["node", "src/index.js"]
+CMD ["node", "logger/index.js"]

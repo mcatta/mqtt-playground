@@ -1,12 +1,12 @@
 {
-  "name": "meshtastic-mqtt-logger",
+  "name": "meshtastic-mqtt-consumer",
   "version": "1.0.0",
   "description": "Node.js application to subscribe to Meshtastic MQTT topics and log events to SQL database",
   "type": "module",
-  "main": "src/index.js",
+  "main": "logger/index.js",
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "node --watch src/index.js"
+    "start": "node logger/index.js",
+    "dev": "node --watch logger/index.js"
   },
   "keywords": [
     "meshtastic",
