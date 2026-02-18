@@ -14,6 +14,7 @@ export interface JWTPayload {
   role: 'admin' | 'user';
   iat?: number;
   exp?: number;
+  [key: string]: any; // Index signature for jose compatibility
 }
 
 // API Response types
